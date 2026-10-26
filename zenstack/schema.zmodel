@@ -1,0 +1,94 @@
+datasource db {
+    provider = 'postgresql'
+    // Migrações usam a conexão direta (sem pooler), como o Neon recomenda.
+    url      = env('DATABASE_URL_UNPOOLED')
+}
+
+plugin policy {
+    provider = '@zenstackhq/plugin-policy'
+}
+
+// Usuário logado (vem do Neon Auth). Os usuários ficam no schema neon_auth.
+type AuthUser {
+    id    String
+    email String?
+    @@auth
+}
+
+// Tipo de gasto: Alimentação, Casa, Automóvel...
+model Category {
+    id            String    @id @default(cuid())
+    userId        String    @default(auth().id)
+    name          String
+    color         String    @default('#10b981')
+    icon          String    @default('wallet')
+    subcategories String[]
+    order         Int       @default(0)
+    expenses      Expense[]
+    createdAt     DateTime  @default(now())
+    updatedAt     DateTime  @updatedAt
+
+    @@unique([userId, name])
+    @@index([userId])
+    @@allow('all', auth() != null && auth().id == userId)
+}
+
+// Um lançamento: uma nota fiscal importada ou um gasto informado à mão.
+model Expense {
+    id          String        @id @default(cuid())
+    userId      String        @default(auth().id)
+    year        Int
+    month       Int
+    date        DateTime      @db.Date
+    category    Category      @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+    categoryId  String
+    subcategory String?
+    description String
+    store       String?
+    // amount = valor bruto, total = valor pago (amount - discount)
+    amount      Float         @default(0)
+    discount    Float         @default(0)
+    tax         Float         @default(0)
+    total       Float         @default(0)
+    source      String        @default('manual')
+    notes       String?
+    items       ExpenseItem[]
+
+    // Dados da NFC-e (quando importada pelo QR code)
+    nfceKey     String?
+    nfceUrl     String?
+    nfceNumber  String?
+    nfceSeries  String?
+    issuedAt    DateTime?
+    cnpj        String?
+    address     String?
+    payments    Json?
+
+    createdAt   DateTime      @default(now())
+    updatedAt   DateTime      @updatedAt
+
+    @@unique([userId, nfceKey])
+    @@index([userId, year, month])
+    @@allow('all', auth() != null && auth().id == userId)
+    // O tipo de gasto precisa ser do próprio usuário
+    @@deny('create,update', category.userId != auth().id)
+}
+
+model ExpenseItem {
+    id          String   @id @default(cuid())
+    userId      String   @default(auth().id)
+    expense     Expense  @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+    expenseId   String
+    position    Int      @default(0)
+    description String
+    code        String?
+    quantity    Float    @default(1)
+    unit        String?
+    unitPrice   Float    @default(0)
+    total       Float    @default(0)
+    discount    Float    @default(0)
+    tax         Float    @default(0)
+
+    @@index([userId, description])
+    @@allow('all', auth() != null && auth().id == userId)
+}
