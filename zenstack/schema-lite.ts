@@ -60,6 +60,12 @@ export class SchemaType implements SchemaDef {
                     array: true,
                     relation: { opposite: "category" }
                 },
+                storeRules: {
+                    name: "storeRules",
+                    type: "StoreRule",
+                    array: true,
+                    relation: { opposite: "category" }
+                },
                 createdAt: {
                     name: "createdAt",
                     type: "DateTime",
@@ -315,6 +321,68 @@ export class SchemaType implements SchemaDef {
             idFields: ["id"],
             uniqueFields: {
                 id: { type: "String" }
+            }
+        },
+        StoreRule: {
+            name: "StoreRule",
+            fields: {
+                id: {
+                    name: "id",
+                    type: "String",
+                    id: true,
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.call("cuid") }] }] as readonly AttributeApplication[],
+                    default: ExpressionUtils.call("cuid") as FieldDefault
+                },
+                userId: {
+                    name: "userId",
+                    type: "String",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.member(ExpressionUtils.call("auth"), ["id"]) }] }] as readonly AttributeApplication[],
+                    default: ExpressionUtils.member(ExpressionUtils.call("auth"), ["id"]) as FieldDefault
+                },
+                pattern: {
+                    name: "pattern",
+                    type: "String"
+                },
+                match: {
+                    name: "match",
+                    type: "String",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal("contains") }] }] as readonly AttributeApplication[],
+                    default: "contains" as FieldDefault
+                },
+                category: {
+                    name: "category",
+                    type: "Category",
+                    relation: { opposite: "storeRules", fields: ["categoryId"], references: ["id"], onDelete: "Cascade" }
+                },
+                categoryId: {
+                    name: "categoryId",
+                    type: "String",
+                    foreignKeyFor: [
+                        "category"
+                    ] as readonly string[]
+                },
+                subcategory: {
+                    name: "subcategory",
+                    type: "String",
+                    optional: true
+                },
+                createdAt: {
+                    name: "createdAt",
+                    type: "DateTime",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.call("now") }] }] as readonly AttributeApplication[],
+                    default: ExpressionUtils.call("now") as FieldDefault
+                },
+                updatedAt: {
+                    name: "updatedAt",
+                    type: "DateTime",
+                    updatedAt: true,
+                    attributes: [{ name: "@updatedAt" }] as readonly AttributeApplication[]
+                }
+            },
+            idFields: ["id"],
+            uniqueFields: {
+                id: { type: "String" },
+                userId_pattern: { userId: { type: "String" }, pattern: { type: "String" } }
             }
         }
     } as const;

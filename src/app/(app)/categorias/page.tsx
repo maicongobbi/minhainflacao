@@ -8,6 +8,7 @@ import { useCategories } from "@/lib/use-data";
 import { CategoryBadge, CategoryIcon, COLORS, ICONS } from "@/lib/categories";
 import { cn } from "@/lib/utils";
 import { PageHeader, PageSkeleton } from "@/components/app-shell";
+import { StoreRulesSection } from "@/components/store-rules-section";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -86,6 +87,8 @@ export default function CategoriesPage() {
           </Card>
         ))}
       </div>
+
+      <StoreRulesSection />
 
       <Dialog open={!!draft} onOpenChange={(v) => !v && setDraft(null)}>
         <DialogContent className="sm:max-w-md">

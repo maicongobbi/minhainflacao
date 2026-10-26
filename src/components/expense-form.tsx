@@ -1,13 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useLayoutEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Plus, QrCode, Receipt, Trash2 } from "lucide-react";
+import { CheckCheck, Loader2, Plus, QrCode, Receipt, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type { ItemDraft, ParsedNfce, Payment } from "@/lib/types";
 import { useDb } from "@/lib/db-client";
 import { useCategories } from "@/lib/use-data";
 import { CategoryIcon } from "@/lib/categories";
+import { findStoreRule, normalizeName } from "@/lib/store-rules";
 import { MONTHS, formatDate, fromIsoDate, money, newId, number, round2 } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -71,11 +72,20 @@ export function ExpenseForm({ initial, openScanner = false }: { initial: Expense
   const create = db.expense.useCreate();
   const update = db.expense.useUpdate();
   const remove = db.expense.useDelete();
+  const { data: rules } = db.storeRule.useFindMany();
+  const createRule = db.storeRule.useCreate();
+  const updateRule = db.storeRule.useUpdate();
 
   const [form, setForm] = useState<ExpenseDraft>(initial);
   const [refTouched, setRefTouched] = useState(!!initial.id);
   const [editing, setEditing] = useState<ItemDraft | null>(null);
   const [scannerOpen, setScannerOpen] = useState(openScanner);
+
+  // O Next mantém a tela viva ao navegar; ao esconder, fecha a câmera e o item aberto.
+  useLayoutEffect(() => () => {
+    setScannerOpen(false);
+    setEditing(null);
+  }, []);
 
   const set = <K extends keyof ExpenseDraft>(k: K, v: ExpenseDraft[K]) => setForm((f) => ({ ...f, [k]: v }));
   const category = categories?.find((c) => c.id === form.categoryId);
@@ -105,17 +115,39 @@ export function ExpenseForm({ initial, openScanner = false }: { initial: Expense
     items = distribute(items, n.discount, "discount");
     items = distribute(items, n.tax, "tax");
     const date = n.issuedAt?.slice(0, 10);
-    const food = categories?.find((c) => /aliment/i.test(c.name));
+    // Tipo de gasto pelo nome do estabelecimento (vínculos automáticos)
+    const rule = findStoreRule(n.store, rules ?? []);
     setForm((f) => ({
       ...f,
       items,
       store: n.store,
       description: f.description || `Compra em ${n.store}`,
-      categoryId: f.categoryId || food?.id || "",
-      subcategory: f.subcategory ?? (food && !f.categoryId ? "Mercado" : null),
+      categoryId: rule?.categoryId ?? f.categoryId,
+      subcategory: rule ? rule.subcategory ?? null : f.subcategory,
       nfce: { key: n.key, url, number: n.number, series: n.series, issuedAt: n.issuedAt, cnpj: n.cnpj, address: n.address, payments: n.payments },
     }));
     if (date) setDate(date);
+  }
+
+  /** Ao digitar a loja à mão, sugere o tipo se ainda não foi escolhido. */
+  function applyStoreRule() {
+    if (form.categoryId || !form.store.trim()) return;
+    const rule = findStoreRule(form.store, rules ?? []);
+    if (rule) setForm((f) => ({ ...f, categoryId: rule.categoryId, subcategory: rule.subcategory ?? null }));
+  }
+
+  /** Lembra o tipo escolhido para esta loja (vínculo pelo nome exato). */
+  async function learnStore(store: string | null, categoryId: string, subcategory: string | null) {
+    if (!store) return;
+    const current = findStoreRule(store, rules ?? []);
+    if (current && current.categoryId === categoryId && (current.subcategory ?? null) === subcategory) return;
+    const exact = rules?.find((r) => r.match === "exact" && normalizeName(r.pattern) === normalizeName(store));
+    try {
+      if (exact) await updateRule.mutateAsync({ where: { id: exact.id }, data: { categoryId, subcategory } });
+      else await createRule.mutateAsync({ data: { pattern: store, match: "exact", categoryId, subcategory } });
+    } catch {
+      // Aprender o vínculo é opcional; não atrapalha o lançamento.
+    }
   }
 
   function saveItem(item: ItemDraft) {
@@ -183,7 +215,15 @@ export function ExpenseForm({ initial, openScanner = false }: { initial: Expense
         await create.mutateAsync({ data: { ...data, items: { create: items } } });
         toast.success("Gasto lançado");
       }
-      router.push(`/mes/${form.year}/${form.month}`);
+      learnStore(data.store, data.categoryId, data.subcategory);
+      if (form.id) {
+        router.push(`/mes/${form.year}/${form.month}`);
+      } else {
+        // Novo lançamento: limpa o formulário e volta para o painel.
+        setForm(initial);
+        setRefTouched(false);
+        router.push("/painel");
+      }
     } catch (err) {
       const msg = String((err as Error)?.message ?? err);
       toast.error(/unique|duplicate/i.test(msg) ? "Essa nota fiscal já foi importada." : "Não foi possível salvar. Tente de novo.");
@@ -200,9 +240,23 @@ export function ExpenseForm({ initial, openScanner = false }: { initial: Expense
   const saving = create.isPending || update.isPending;
   const years = Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - 4 + i);
 
+  const saveLabel = form.id ? "Salvar" : "Lançar";
+
   return (
     <form onSubmit={submit} className="grid gap-4 lg:grid-cols-[1fr_360px] lg:items-start">
       <div className="grid min-w-0 gap-4">
+        {/* Ações no topo: ler nota e salvar */}
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" size="lg" className="flex-1" onClick={() => setScannerOpen(true)}>
+            <QrCode /> Ler nota fiscal
+          </Button>
+          <Button type="submit" size="lg" disabled={saving} aria-label={saveLabel} className="px-4 sm:px-6">
+            {saving ? <Loader2 className="animate-spin" /> : <CheckCheck />}
+            {saveLabel}
+            <span className="hidden tabular-nums sm:inline">· {money(toPay)}</span>
+          </Button>
+        </div>
+
         {/* Tipo de gasto */}
         <Card>
           <CardHeader>
@@ -263,7 +317,7 @@ export function ExpenseForm({ initial, openScanner = false }: { initial: Expense
             </div>
             <div className="grid gap-2">
               <Label htmlFor="store">Estabelecimento</Label>
-              <Input id="store" value={form.store} onChange={(e) => set("store", e.target.value)} placeholder="Opcional" />
+              <Input id="store" value={form.store} onChange={(e) => set("store", e.target.value)} onBlur={applyStoreRule} placeholder="Opcional" />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="date">Data</Label>
@@ -316,9 +370,6 @@ export function ExpenseForm({ initial, openScanner = false }: { initial: Expense
           <CardHeader className="pb-4">
             <CardTitle>Itens {hasItems && <span className="text-muted-foreground">({form.items.length})</span>}</CardTitle>
             <CardAction className="flex gap-2">
-              <Button type="button" size="sm" variant="outline" onClick={() => setScannerOpen(true)}>
-                <QrCode /> <span className="hidden sm:inline">Ler nota</span>
-              </Button>
               <Button type="button" size="sm" variant="outline" onClick={() => setEditing(emptyItem())}>
                 <Plus /> <span className="hidden sm:inline">Item</span>
               </Button>
@@ -372,7 +423,7 @@ export function ExpenseForm({ initial, openScanner = false }: { initial: Expense
             </div>
           )}
           <Button type="submit" size="lg" disabled={saving}>
-            {saving && <Loader2 className="animate-spin" />}
+            {saving ? <Loader2 className="animate-spin" /> : <CheckCheck />}
             {form.id ? "Salvar alterações" : "Lançar gasto"}
           </Button>
           {form.id && (

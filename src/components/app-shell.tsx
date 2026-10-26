@@ -8,6 +8,7 @@ import { CalendarDays, LayoutDashboard, LogOut, Moon, Plus, Sun, Tags, TrendingU
 import { authClient } from "@/lib/auth/client";
 import { useDb } from "@/lib/db-client";
 import { DEFAULT_CATEGORIES } from "@/lib/categories";
+import { DEFAULT_STORE_RULES, normalizeName } from "@/lib/store-rules";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -31,20 +32,35 @@ const NAV = [
 
 const resolve = (h: string | (() => string)) => (typeof h === "function" ? h() : h);
 
-/** Cria os tipos de gasto padrão na primeira vez que o usuário entra. */
-function useSeedCategories(enabled: boolean) {
+/**
+ * Na primeira vez que o usuário entra: cria os tipos de gasto padrão e, depois,
+ * os vínculos automáticos de estabelecimentos (também para contas antigas).
+ */
+function useSeedDefaults(enabled: boolean) {
   const db = useDb();
-  const { data, isSuccess } = db.category.useCount({}, { enabled });
-  const create = db.category.useCreateMany();
-  const done = useRef(false);
+  const categories = db.category.useFindMany({ select: { id: true, name: true } }, { enabled });
+  const rules = db.storeRule.useCount({}, { enabled });
+  const createCategories = db.category.useCreateMany();
+  const createRules = db.storeRule.useCreateMany();
+  const done = useRef({ categories: false, rules: false });
+
   useEffect(() => {
-    if (!enabled || !isSuccess || data !== 0 || done.current) return;
-    done.current = true;
-    create.mutate({
-      data: DEFAULT_CATEGORIES.map((c, i) => ({ ...c, order: i })),
-      skipDuplicates: true,
+    if (!enabled || !categories.isSuccess) return;
+    if (categories.data.length === 0) {
+      if (done.current.categories) return;
+      done.current.categories = true;
+      createCategories.mutate({ data: DEFAULT_CATEGORIES.map((c, i) => ({ ...c, order: i })), skipDuplicates: true });
+      return;
+    }
+    if (!rules.isSuccess || rules.data !== 0 || done.current.rules) return;
+    done.current.rules = true;
+    const byName = new Map(categories.data.map((c) => [normalizeName(c.name), c.id]));
+    const data = DEFAULT_STORE_RULES.flatMap((r) => {
+      const categoryId = byName.get(normalizeName(r.category));
+      return categoryId ? [{ pattern: r.pattern, match: "contains", categoryId, subcategory: r.subcategory }] : [];
     });
-  }, [enabled, isSuccess, data, create]);
+    if (data.length) createRules.mutate({ data, skipDuplicates: true });
+  }, [enabled, categories.isSuccess, categories.data, rules.isSuccess, rules.data, createCategories, createRules]);
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -57,7 +73,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!isPending && !user) router.replace("/");
   }, [isPending, user, router]);
-  useSeedCategories(!!user);
+  useSeedDefaults(!!user);
 
   async function signOut() {
     await authClient.signOut();

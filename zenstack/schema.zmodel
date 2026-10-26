@@ -25,6 +25,7 @@ model Category {
     subcategories String[]
     order         Int       @default(0)
     expenses      Expense[]
+    storeRules    StoreRule[]
     createdAt     DateTime  @default(now())
     updatedAt     DateTime  @updatedAt
 
@@ -91,4 +92,23 @@ model ExpenseItem {
 
     @@index([userId, description])
     @@allow('all', auth() != null && auth().id == userId)
+}
+
+// Vínculo automático: estabelecimento (razão social) -> tipo de gasto.
+// match 'contains': o nome contém a palavra (ex.: DROGA pega DROGARIA, DROGASIL).
+// match 'exact': nome completo da loja, aprendido ao salvar um lançamento.
+model StoreRule {
+    id          String   @id @default(cuid())
+    userId      String   @default(auth().id)
+    pattern     String
+    match       String   @default('contains')
+    category    Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+    categoryId  String
+    subcategory String?
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
+    @@unique([userId, pattern])
+    @@allow('all', auth() != null && auth().id == userId)
+    @@deny('create,update', category.userId != auth().id)
 }
