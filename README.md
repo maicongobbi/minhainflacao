@@ -26,7 +26,7 @@ Segurança: todas as tabelas têm `userId` preenchido automaticamente com o usu�
 
 ```bash
 npm install
-neon env pull                              # ou copie .env.example para .env.local
+neon env pull                              # pasta ligada à branch dev do Neon
 echo "NEON_AUTH_COOKIE_SECRET=$(openssl rand -base64 32)" >> .env.local
 npm run dev
 ```
@@ -40,11 +40,21 @@ npm run db:migrate -- --name <nome> # cria e aplica a migração (usa DATABASE_U
 npm run db:deploy                   # aplica as migrações pendentes (produção)
 ```
 
-## Deploy na Vercel
+## Ambientes e deploy
 
-1. Importe o repositório na Vercel.
-2. Cadastre as variáveis de ambiente do `.env.example`, com os valores do `.env.local`. A integração Neon ↔ Vercel já cria as de banco; o `NEON_AUTH_COOKIE_SECRET` precisa ser criado à mão.
-   O script `vercel-build` roda `zen migrate deploy` antes do build, então as migrações são aplicadas em cada deploy.
-3. Depois do primeiro deploy, libere o domínio no Neon Auth:
-   `neon neon-auth domain add https://SEU-APP.vercel.app`
-4. **Antes de abrir para outras pessoas:** o login Google usa credenciais compartilhadas do Neon, que servem só para desenvolvimento e mostram a marca do Neon na tela de consentimento. Crie um OAuth Client no Google Cloud com o redirect `{NEON_AUTH_BASE_URL}/callback/google` e cadastre-o com `neon neon-auth oauth-provider update`.
+| Git | Vercel | Banco Neon |
+| --- | --- | --- |
+| `dev` (branch padrão, onde se trabalha) | Preview: https://minhainflacao-git-dev-maicongobbis-projects.vercel.app | branch `dev` |
+| `prd` (publicação) | Produção: https://minhainflacao-mu.vercel.app | branch `production` |
+| local (`npm run dev`) | — | branch `dev` (via `.env.local`) |
+
+Para publicar, leve a `dev` para a `prd`:
+
+```bash
+git checkout prd && git merge --ff-only dev && git push && git checkout dev
+```
+
+- O script `vercel-build` roda `zen migrate deploy` antes do build, então cada ambiente aplica as próprias migrações pendentes no seu banco.
+- As variáveis de Produção vêm da integração Neon ↔ Vercel, mais o `NEON_AUTH_COOKIE_SECRET`. As de Preview estão restritas à branch `dev` e apontam para o banco dev.
+- Os domínios precisam estar liberados no Neon Auth de cada branch (`neon neon-auth domain add <url> --branch <dev|production>`).
+- **Antes de abrir para outras pessoas:** o login Google usa credenciais compartilhadas do Neon, que servem só para desenvolvimento e mostram a marca do Neon na tela de consentimento. Crie um OAuth Client no Google Cloud com o redirect `{NEON_AUTH_BASE_URL}/callback/google` e cadastre-o com `neon neon-auth oauth-provider update --branch production`.
