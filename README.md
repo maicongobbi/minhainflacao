@@ -45,7 +45,7 @@ npm run db:deploy                   # aplica as migrações pendentes (produçã
 | Git | Vercel | Banco Neon |
 | --- | --- | --- |
 | `dev` (branch padrão, onde se trabalha) | Preview: https://minhainflacao-git-dev-maicongobbis-projects.vercel.app | branch `dev` |
-| `prd` (publicação) | Produção: https://minhainflacao-mu.vercel.app | branch `production` |
+| `prd` (publicação) | Produção: https://minhainflacaoreal.vercel.app | branch `production` |
 | local (`npm run dev`) | — | branch `dev` (via `.env.local`) |
 
 Para publicar, leve a `dev` para a `prd`:
