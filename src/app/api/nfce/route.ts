@@ -1,8 +1,12 @@
 import { getSessionUser } from "@/lib/auth/server";
 import { fetchNfce, keyFromUrl, NfceError, validateNfceUrl } from "@/server/nfce";
+import { fetchUtilityBill, utilityBillKey, utilityBillKind } from "@/server/utility-bill";
 import { dbFor } from "@/server/db";
 
-/** Recebe a URL do QR code, consulta a SEFAZ e devolve os dados da nota. */
+/**
+ * Recebe a URL do QR code, consulta a SEFAZ e devolve os dados da nota.
+ * Aceita NFC-e (compras), NF3e (conta de energia) e NFAg (conta de água).
+ */
 export async function POST(req: Request) {
   const user = await getSessionUser();
   if (!user) return Response.json({ error: "Faça login para importar notas." }, { status: 401 });
@@ -12,14 +16,15 @@ export async function POST(req: Request) {
 
   try {
     const url = validateNfceUrl(body.url);
+    const isUtility = utilityBillKind(url) !== null;
     const db = dbFor(user);
     // Nota já importada? Evita consultar a SEFAZ de novo.
-    const urlKey = keyFromUrl(url);
+    const urlKey = isUtility ? utilityBillKey(url) : keyFromUrl(url);
     if (urlKey) {
       const existing = await db.expense.findFirst({ where: { nfceKey: urlKey }, select: { id: true } });
       if (existing) return Response.json({ existingId: existing.id }, { status: 409 });
     }
-    const nfce = await fetchNfce(url);
+    const nfce = isUtility ? await fetchUtilityBill(url) : await fetchNfce(url);
     if (nfce.key && nfce.key !== urlKey) {
       const existing = await db.expense.findFirst({ where: { nfceKey: nfce.key }, select: { id: true } });
       if (existing) return Response.json({ existingId: existing.id }, { status: 409 });

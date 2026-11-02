@@ -15,8 +15,10 @@ Controle de gastos mensais com importação de NFC-e pelo QR code e acompanhamen
 - `/painel`: total do ano, média mensal, gasto por mês e por tipo
 - `/mes/[ano]/[mes]`: lançamentos do mês, agrupados por tipo
 - `/lancamento/novo`: lançamento manual (só o valor, ou item a item) ou importação da nota pelo QR code
-- `/precos`: variação de preço de cada item entre a primeira e a última compra, e a sua inflação ponderada
+- `/precos`: sua inflação no último mês, em 3, 6 e 12 meses, ao lado do IPCA do IBGE (alimentação e bebidas, alimentação no domicílio e geral); variação ano a ano e preço de cada item. O IPCA fica na tabela `OfficialIndex` e é atualizado pelo botão "Atualizar IPCA" (rota `/api/ipca`, que consulta a API SIDRA do IBGE)
 - `/categorias`: tipos de gasto e subtipos (ex.: Casa → Água, Luz, Telefone)
+
+A importação também lê o QR code da conta de luz (NF3e) e da conta de água (NFAg), em `src/server/utility-bill.ts`. No MS a NF3e vem da API pública do portal (`/d0712/api/publica/...`); na SVRS (NFAg e NF3e de outros estados) a página do QR reenvia um formulário, e o servidor repete esse POST. Como a consulta pública esconde a descrição dos itens, o nome vem do código de classificação. A energia injetada (geração solar, grupo 560) entra como desconto no consumo.
 
 A importação da nota (`/api/nfce`) aceita só URLs `*.gov.br`, consulta o portal da SEFAZ no servidor e lê itens, descontos, tributos, CNPJ e data. Foi testada com o portal do MS, que usa o layout padrão adotado por vários estados. Portais com layout diferente (por exemplo, SP) podem precisar de um parser próprio em `src/server/nfce.ts`.
 

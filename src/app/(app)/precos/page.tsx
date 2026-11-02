@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { Search, TrendingDown, TrendingUp } from "lucide-react";
 import { useDb } from "@/lib/db-client";
-import { money, percent, variation } from "@/lib/format";
+import { money, percent, toIsoDate, variation } from "@/lib/format";
 import { normalizeName } from "@/lib/store-rules";
 import type { Purchase } from "@/lib/inflation";
 import { InflationComparison } from "@/components/inflation-comparison";
@@ -37,13 +37,13 @@ export default function PricesPage() {
 
   const { data, isLoading } = db.expenseItem.useFindMany({
     where: { unitPrice: { gt: 0 }, quantity: { gt: 0 }, expense: { year: { gte: firstYear } } },
-    select: { description: true, total: true, quantity: true, unit: true, expense: { select: { year: true, month: true } } },
+    select: { description: true, total: true, quantity: true, unit: true, expense: { select: { year: true, date: true } } },
   });
 
   const purchases = useMemo<Purchase[]>(
     () =>
       (data ?? []).map((it) => ({
-        name: it.description, unit: it.unit ?? null, year: it.expense.year, month: it.expense.month,
+        name: it.description, unit: it.unit ?? null, date: toIsoDate(it.expense.date),
         total: it.total, quantity: it.quantity,
       })),
     [data],

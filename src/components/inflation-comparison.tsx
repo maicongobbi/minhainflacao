@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { useDb } from "@/lib/db-client";
-import { formatDate, percent } from "@/lib/format";
+import { formatDate, money, percent } from "@/lib/format";
 import { monthLabel, officialInflation, PERIODS, periodToIndex, personalInflation, type Purchase } from "@/lib/inflation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -15,11 +15,14 @@ const PERIOD_LABEL: Record<number, string> = { 1: "Último mês", 3: "3 meses", 
 const toneClass = (v: number | null) =>
   v === null ? "text-muted-foreground" : v > 0 ? "text-red-600 dark:text-red-400" : v < 0 ? "text-emerald-600 dark:text-emerald-400" : "";
 
+const shortDate = (iso: string) => formatDate(iso).slice(0, 5) + "/" + iso.slice(2, 4);
+
 /** Sua inflação nos últimos 1, 3, 6 e 12 meses, ao lado do IPCA divulgado pelo IBGE. */
 export function InflationComparison({ purchases }: { purchases: Purchase[] }) {
   const db = useDb();
   const official = db.officialIndex.useFindMany({ select: { series: true, period: true, value: true, updatedAt: true } });
   const [refreshing, setRefreshing] = useState(false);
+  const [selected, setSelected] = useState<number | null>(null);
   const autoRefreshed = useRef(false);
 
   const personal = useMemo(() => personalInflation(purchases), [purchases]);
@@ -59,12 +62,16 @@ export function InflationComparison({ purchases }: { purchases: Purchase[] }) {
     { key: "ipca", label: "IPCA geral", data: ipca.ipca },
   ] as const;
 
+  const detail = selected === null ? null : personal.results[PERIODS.indexOf(selected as (typeof PERIODS)[number])];
+
   return (
     <Card className="gap-4 p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <h2 className="font-semibold">Sua inflação x IPCA</h2>
-          <p className="text-xs text-muted-foreground">Variação de preço dos itens que você compra, ao lado da inflação oficial.</p>
+          <p className="text-xs text-muted-foreground">
+            Variação de preço dos itens que você compra, ao lado da inflação oficial. Toque num período para ver os itens.
+          </p>
         </div>
         <Button variant="outline" size="sm" onClick={() => refresh()} disabled={refreshing}>
           <RefreshCw className={cn(refreshing && "animate-spin")} />
@@ -76,7 +83,16 @@ export function InflationComparison({ purchases }: { purchases: Purchase[] }) {
         {PERIODS.map((n, i) => {
           const mine = personal.results[i];
           return (
-            <div key={n} className="rounded-lg border p-3">
+            <button
+              key={n}
+              type="button"
+              onClick={() => setSelected(selected === n ? null : n)}
+              aria-pressed={selected === n}
+              className={cn(
+                "rounded-lg border p-3 text-left transition-colors hover:bg-muted/50",
+                selected === n && "border-primary bg-muted/50",
+              )}
+            >
               <div className="text-xs font-medium text-muted-foreground">{PERIOD_LABEL[n]}</div>
               <div className={cn("mt-1 text-xl font-semibold tabular-nums md:text-2xl", toneClass(mine.value))}>
                 {percent(mine.value)}
@@ -95,14 +111,44 @@ export function InflationComparison({ purchases }: { purchases: Purchase[] }) {
                   );
                 })}
               </dl>
-            </div>
+            </button>
           );
         })}
       </div>
 
+      {detail && (
+        <div className="rounded-lg border">
+          <div className="border-b bg-muted/50 px-3 py-2 text-xs font-medium text-muted-foreground">
+            {PERIOD_LABEL[detail.months]}: itens comparados
+          </div>
+          {detail.items?.length ? (
+            <div className="max-h-80 divide-y overflow-y-auto">
+              {detail.items.map((it) => (
+                <div key={`${it.name}|${it.unit}`} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                  <div className="min-w-0">
+                    <div className="truncate">
+                      {it.name}
+                      {it.unit && <span className="ml-1 text-xs text-muted-foreground">/{it.unit.toLowerCase()}</span>}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {shortDate(it.from)} → {shortDate(it.to)} · gasto {money(it.spent)}
+                    </div>
+                  </div>
+                  <span className={cn("shrink-0 font-medium tabular-nums", toneClass(it.change))}>{percent(it.change)}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="px-3 py-4 text-sm text-muted-foreground">
+              Nenhum item comprado recentemente tem uma compra cerca de {detail.months === 1 ? "1 mês" : `${detail.months} meses`} antes.
+            </p>
+          )}
+        </div>
+      )}
+
       <p className="text-xs text-muted-foreground">
         {personal.latest !== null
-          ? `Você: preço médio de cada item no mês mais recente em que foi comprado (até ${monthLabel(personal.latest)}), comparado com N meses antes, com peso pelo quanto você gastou nele. `
+          ? `Você: preço por unidade de cada item na compra mais recente (até ${formatDate(personal.latest)}) comparado com o da compra feita cerca de N meses antes, com peso pelo quanto você gastou nele. `
           : "Você: importe notas com itens para calcular sua inflação. "}
         {ipca.alimentos.latest !== null
           ? `IPCA: acumulado nos últimos meses divulgados, até ${monthLabel(ipca.alimentos.latest)}. Fonte: IBGE${updatedAt ? `, atualizado em ${formatDate(updatedAt)}` : ""}.`

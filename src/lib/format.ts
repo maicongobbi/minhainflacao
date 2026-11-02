@@ -77,6 +77,12 @@ export function todayIso(): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+/** Tipo do documento pelo modelo na chave de acesso (posições 21-22). */
+export function docLabel(key: string | null | undefined): string {
+  const model = key?.length === 44 ? key.slice(20, 22) : null;
+  return { "55": "NF-e", "65": "NFC-e", "66": "Energia", "75": "Água" }[model ?? ""] ?? "NFC-e";
+}
+
 export function newId(): string {
   return Math.random().toString(36).slice(2, 10);
 }

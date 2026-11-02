@@ -95,7 +95,9 @@ export function NfceImportDialog({
       <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Importar nota fiscal</DialogTitle>
-          <DialogDescription>Leia o QR code da NFC-e pela câmera, por uma foto ou colando o link.</DialogDescription>
+          <DialogDescription>
+            Leia o QR code da NFC-e, da conta de luz ou da conta de água pela câmera, por uma foto ou colando o link.
+          </DialogDescription>
         </DialogHeader>
 
         <Tabs value={tab} onValueChange={setTab}>

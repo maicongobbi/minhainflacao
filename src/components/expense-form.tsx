@@ -9,7 +9,7 @@ import { useDb } from "@/lib/db-client";
 import { useCategories } from "@/lib/use-data";
 import { CategoryIcon } from "@/lib/categories";
 import { findStoreRule, normalizeName } from "@/lib/store-rules";
-import { MONTHS, formatDate, fromIsoDate, money, newId, number, round2 } from "@/lib/format";
+import { MONTHS, docLabel, formatDate, fromIsoDate, money, newId, number, round2 } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -111,8 +111,9 @@ export function ExpenseForm({ initial, openScanner = false }: { initial: Expense
   }
 
   function onImported(n: ParsedNfce, url: string) {
-    let items: ItemDraft[] = n.items.map((i) => ({ ...i, key: newId(), discount: 0, tax: 0 }));
-    items = distribute(items, n.discount, "discount");
+    let items: ItemDraft[] = n.items.map((i) => ({ ...i, key: newId(), discount: i.discount ?? 0, tax: 0 }));
+    // Se a nota já disse de qual item é o desconto (conta de energia), não redistribui.
+    if (!items.some((i) => i.discount)) items = distribute(items, n.discount, "discount");
     items = distribute(items, n.tax, "tax");
     const date = n.issuedAt?.slice(0, 10);
     // Tipo de gasto pelo nome do estabelecimento (vínculos automáticos)
@@ -121,7 +122,7 @@ export function ExpenseForm({ initial, openScanner = false }: { initial: Expense
       ...f,
       items,
       store: n.store,
-      description: f.description || `Compra em ${n.store}`,
+      description: f.description || n.description || `Compra em ${n.store}`,
       categoryId: rule?.categoryId ?? f.categoryId,
       subcategory: rule ? rule.subcategory ?? null : f.subcategory,
       nfce: { key: n.key, url, number: n.number, series: n.series, issuedAt: n.issuedAt, cnpj: n.cnpj, address: n.address, payments: n.payments },
@@ -306,7 +307,7 @@ export function ExpenseForm({ initial, openScanner = false }: { initial: Expense
             <CardTitle>Dados do gasto</CardTitle>
             {form.nfce && (
               <CardAction>
-                <Badge variant="secondary">NFC-e {form.nfce.number ? `nº ${form.nfce.number}` : ""}</Badge>
+                <Badge variant="secondary">{docLabel(form.nfce.key)} {form.nfce.number ? `nº ${form.nfce.number}` : ""}</Badge>
               </CardAction>
             )}
           </CardHeader>

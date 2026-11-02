@@ -7,7 +7,7 @@ import { ChevronRight, Plus, QrCode, Receipt } from "lucide-react";
 import { useDb } from "@/lib/db-client";
 import { useCategories } from "@/lib/use-data";
 import { CategoryBadge } from "@/lib/categories";
-import { MONTHS, formatDate, money } from "@/lib/format";
+import { MONTHS, docLabel, formatDate, money } from "@/lib/format";
 import { PageHeader, PageSkeleton } from "@/components/app-shell";
 import { StepperNav } from "@/components/year-month-nav";
 import { StatCard } from "@/components/stat-card";
@@ -97,7 +97,7 @@ export default function MonthPage({ params }: PageProps<"/mes/[ano]/[mes]">) {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <span className="truncate font-medium">{e.description}</span>
-                        {e.source === "nfce" && <Badge variant="secondary" className="shrink-0">NFC-e</Badge>}
+                        {e.source === "nfce" && <Badge variant="secondary" className="shrink-0">{docLabel(e.nfceKey)}</Badge>}
                       </div>
                       <div className="mt-0.5 truncate text-xs text-muted-foreground">
                         {formatDate(e.date)}
