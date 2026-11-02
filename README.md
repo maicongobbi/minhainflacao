@@ -31,6 +31,17 @@ echo "NEON_AUTH_COOKIE_SECRET=$(openssl rand -base64 32)" >> .env.local
 npm run dev
 ```
 
+### Rodando local com o banco de produção
+
+```bash
+neon env pull --branch production --file .env.prd.local   # uma vez
+npm run dev:prd
+```
+
+O `dev:prd` carrega o `.env.prd.local` antes do Next. Essas variáveis têm prioridade sobre o `.env.local`, e o que faltar (por exemplo, `NEON_AUTH_COOKIE_SECRET`) vem do `.env.local`. **Cuidado: os dados são reais.** O que você criar, editar ou apagar vai direto para produção. As migrações (`db:migrate`) continuam usando só o `.env.local` (dev).
+
+Para fazer login, o Neon Auth da branch `production` precisa aceitar `localhost` (`neon neon-auth domain allow-localhost --branch production`).
+
 ## Banco de dados
 
 ```bash
@@ -47,6 +58,7 @@ npm run db:deploy                   # aplica as migrações pendentes (produçã
 | `dev` (branch padrão, onde se trabalha) | Preview: https://minhainflacao-git-dev-maicongobbis-projects.vercel.app | branch `dev` |
 | `prd` (publicação) | Produção: https://minhainflacaoreal.vercel.app | branch `production` |
 | local (`npm run dev`) | — | branch `dev` (via `.env.local`) |
+| local (`npm run dev:prd`) | — | branch `production` (via `.env.prd.local`) |
 
 Para publicar, leve a `dev` para a `prd`:
 

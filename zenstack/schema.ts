@@ -341,6 +341,45 @@ export class SchemaType implements SchemaDef {
                 id: { type: "String" }
             }
         },
+        OfficialIndex: {
+            name: "OfficialIndex",
+            fields: {
+                id: {
+                    name: "id",
+                    type: "String",
+                    id: true,
+                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("cuid") }] }] as readonly AttributeApplication[],
+                    default: ExpressionUtils.call("cuid") as FieldDefault
+                },
+                series: {
+                    name: "series",
+                    type: "String"
+                },
+                period: {
+                    name: "period",
+                    type: "Int"
+                },
+                value: {
+                    name: "value",
+                    type: "Float"
+                },
+                updatedAt: {
+                    name: "updatedAt",
+                    type: "DateTime",
+                    updatedAt: true,
+                    attributes: [{ name: "@updatedAt" }] as readonly AttributeApplication[]
+                }
+            },
+            attributes: [
+                { name: "@@unique", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("series"), ExpressionUtils.field("period")]) }] },
+                { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("read") }, { name: "condition", value: ExpressionUtils.binary(ExpressionUtils.call("auth"), "!=", ExpressionUtils._null()) }] }
+            ] as readonly AttributeApplication[],
+            idFields: ["id"],
+            uniqueFields: {
+                id: { type: "String" },
+                series_period: { series: { type: "String" }, period: { type: "Int" } }
+            }
+        },
         StoreRule: {
             name: "StoreRule",
             fields: {

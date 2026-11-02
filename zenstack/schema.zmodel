@@ -94,6 +94,21 @@ model ExpenseItem {
     @@allow('all', auth() != null && auth().id == userId)
 }
 
+// Índices oficiais (IPCA do IBGE), iguais para todos os usuários.
+// Só o servidor grava (rota /api/ipca); usuários logados podem ler.
+// series: 'ipca' (índice geral), 'alimentos' (alimentação e bebidas),
+// 'domicilio' (alimentação no domicílio). period: AAAAMM. value: variação mensal em %.
+model OfficialIndex {
+    id        String   @id @default(cuid())
+    series    String
+    period    Int
+    value     Float
+    updatedAt DateTime @updatedAt
+
+    @@unique([series, period])
+    @@allow('read', auth() != null)
+}
+
 // Vínculo automático: estabelecimento (razão social) -> tipo de gasto.
 // match 'contains': o nome contém a palavra (ex.: DROGA pega DROGARIA, DROGASIL).
 // match 'exact': nome completo da loja, aprendido ao salvar um lançamento.

@@ -5,6 +5,8 @@ import { Search, TrendingDown, TrendingUp } from "lucide-react";
 import { useDb } from "@/lib/db-client";
 import { money, percent, variation } from "@/lib/format";
 import { normalizeName } from "@/lib/store-rules";
+import type { Purchase } from "@/lib/inflation";
+import { InflationComparison } from "@/components/inflation-comparison";
 import { cn } from "@/lib/utils";
 import { PageHeader, PageSkeleton } from "@/components/app-shell";
 import { StatCard } from "@/components/stat-card";
@@ -35,8 +37,17 @@ export default function PricesPage() {
 
   const { data, isLoading } = db.expenseItem.useFindMany({
     where: { unitPrice: { gt: 0 }, quantity: { gt: 0 }, expense: { year: { gte: firstYear } } },
-    select: { description: true, total: true, quantity: true, unit: true, expense: { select: { year: true } } },
+    select: { description: true, total: true, quantity: true, unit: true, expense: { select: { year: true, month: true } } },
   });
+
+  const purchases = useMemo<Purchase[]>(
+    () =>
+      (data ?? []).map((it) => ({
+        name: it.description, unit: it.unit ?? null, year: it.expense.year, month: it.expense.month,
+        total: it.total, quantity: it.quantity,
+      })),
+    [data],
+  );
 
   const { rows, annual, accumulated } = useMemo(() => {
     const groups = new Map<string, { name: string; unit: string | null; years: Map<number, YearAgg> }>();
@@ -98,9 +109,12 @@ export default function PricesPage() {
     <>
       <PageHeader
         title="Preços"
-        description={`Sua inflação pessoal de ${years[0]} a ${now}: quanto o preço dos itens que você compra mudou de um ano para o outro.`}
+        description="Quanto o preço dos itens que você compra mudou, comparado com a inflação oficial."
       />
 
+      <InflationComparison purchases={purchases} />
+
+      <h2 className="mt-6 mb-3 text-sm font-medium text-muted-foreground">Ano a ano ({years[0]}–{now})</h2>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         {annual.map((a) => (
           <StatCard

@@ -10,5 +10,6 @@ import type { ModelResult as $ModelResult, TypeDefResult as $TypeDefResult } fro
 export type Category = $ModelResult<$Schema, "Category">;
 export type Expense = $ModelResult<$Schema, "Expense">;
 export type ExpenseItem = $ModelResult<$Schema, "ExpenseItem">;
+export type OfficialIndex = $ModelResult<$Schema, "OfficialIndex">;
 export type StoreRule = $ModelResult<$Schema, "StoreRule">;
 export type AuthUser = $TypeDefResult<$Schema, "AuthUser">;

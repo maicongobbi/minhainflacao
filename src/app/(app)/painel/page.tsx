@@ -27,19 +27,24 @@ export default function DashboardPage() {
   const stats = useMemo(() => {
     const byMonth = Array.from({ length: 12 }, () => 0);
     const byCat = new Map<string, number>();
-    let total = 0, discount = 0, tax = 0;
+    let total = 0, discount = 0, tax = 0, taxedTotal = 0;
     for (const e of expenses ?? []) {
       byMonth[e.month - 1] += e.total;
       byCat.set(e.categoryId, (byCat.get(e.categoryId) ?? 0) + e.total);
       total += e.total;
       discount += e.discount;
       tax += e.tax;
+      // Base dos percentuais: só lançamentos que informam tributo (notas fiscais)
+      if (e.tax > 0) taxedTotal += e.total;
     }
     const isCurrentYear = year === now.getFullYear();
     const refMonth = isCurrentYear ? now.getMonth() : 11; // índice 0-11
     const monthsWithData = byMonth.filter((v, i) => v > 0 && i <= refMonth).length || 1;
     return {
       byMonth, byCat, total, discount, tax,
+      // Por dentro: imposto / preço pago. Por fora: imposto / preço sem imposto.
+      taxInside: taxedTotal ? (tax / taxedTotal) * 100 : null,
+      taxOutside: taxedTotal > tax ? (tax / (taxedTotal - tax)) * 100 : null,
       average: total / monthsWithData,
       refMonth,
       current: byMonth[refMonth],
@@ -79,7 +84,16 @@ export default function DashboardPage() {
         <StatCard
           label="Descontos · Impostos"
           value={<span className="text-emerald-600 dark:text-emerald-400">{money(stats.discount)}</span>}
-          hint={<span className="inline-flex items-center gap-1"><Landmark className="size-3" /> {money(stats.tax)} em tributos</span>}
+          hint={
+            <>
+              <span className="inline-flex items-center gap-1"><Landmark className="size-3" /> {money(stats.tax)} em tributos</span>
+              {stats.taxInside !== null && (
+                <span className="block tabular-nums">
+                  {rate(stats.taxInside)} por dentro · {rate(stats.taxOutside)} por fora
+                </span>
+              )}
+            </>
+          }
           icon={<BadgePercent className="size-4" />}
         />
       </div>
@@ -156,6 +170,10 @@ export default function DashboardPage() {
       </div>
     </>
   );
+}
+
+function rate(v: number | null) {
+  return v === null ? "—" : `${v.toFixed(1).replace(".", ",")}%`;
 }
 
 function EmptyYear({ year }: { year: number }) {
